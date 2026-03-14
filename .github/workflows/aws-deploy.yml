@@ -1,12 +1,14 @@
 name: Terraform AWS Deploy
 
 on:
+  pull_request:
+    branches: [main] # Trigger on pull requests to the main branch, PR validation (blocks merge)
   push:
-    branches:
-      - main
+    branches: [main] # Trigger on pushes to the main branch, Deploy only on main
 
 jobs:
   checkov-scan:
+    if: github.event_name == 'pull_request' # Run Checkov scan only for pull requests, ensuring that we are not blocking deployments on pushes to main
     runs-on: ubuntu-latest
     # Granting permissions for security events and contents is necessary for uploading SARIF results to the GitHub Security tab.
     permissions:
@@ -20,7 +22,7 @@ jobs:
           python-version: 3.9
       - name: Test with checkov
         id: checkov
-        uses: bridgecrewio/checkov-action@v2
+        uses: bridgecrewio/checkov-action@v12
         with:
           directory: .
           frameworks: terraform
@@ -35,7 +37,8 @@ jobs:
 
   terraform-plan:
     name: Terraform Deploy ECS Cluster
-    needs: checkov-scan # Terraform Apply should only run if Checkov scan passes without any critical issues. This ensures that we are not deploying vulnerable infrastructure.
+    needs: checkov-scan # Only runs after Checkov passes
+    if: github.ref == 'refs/heads/main' # Only run on pushes to main, ensuring that we are not deploying on pull requests
     runs-on: ubuntu-latest
 
     env:
